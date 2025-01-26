@@ -1,0 +1,21 @@
+
+volumes:
+  keycloak-db-data-local:
+    name: keycloak-db-data-local
+
+networks:
+  callv2-auth-db-network-local:
+    name: callv2-auth-db-network-local
+
+services:
+  keycloak-db:
+    container_name: keycloak-db
+    image: postgres:17.2
+    volumes:
+      - keycloak-db-data-local:/var/lib/postgresql/data
+    networks:
+      - callv2-auth-db-network-local
+    environment:
+      - POSTGRES_PASSWORD=keycloak
+      - POSTGRES_USER=keycloak
+      - POSTGRES_DB=keycloak
