@@ -1,11 +1,18 @@
-
 volumes:
   keycloak-db-data-local:
     name: keycloak-db-data-local
+  member-db-data-local:
+    name: member-db-data-local
+  drive-db-data-local:
+    name: drive-db-data-local
 
 networks:
   callv2-auth-db-network-local:
     name: callv2-auth-db-network-local
+  callv2-member-db-network-local:
+    name: callv2-member-db-network-local
+  callv2-drive-db-network-local:
+    name: callv2-drive-db-network-local
 
 services:
   keycloak-db:
@@ -19,3 +26,31 @@ services:
       - POSTGRES_PASSWORD=keycloak
       - POSTGRES_USER=keycloak
       - POSTGRES_DB=keycloak
+
+  member-db:
+    container_name: member-db
+    image: postgres:17.2
+    ports:
+      - 5432:5432
+    volumes:
+      - member-db-data-local:/var/lib/postgresql/data
+    networks:
+      - callv2-member-db-network-local
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=member
+
+  drive-db:
+    container_name: drive-db
+    image: postgres:17.2
+    ports:
+      - 5433:5432
+    volumes:
+      - drive-db-data-local:/var/lib/postgresql/data
+    networks:
+      - callv2-drive-db-network-local
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=drive
