@@ -1,0 +1,113 @@
+name: Deploy Infrastructure
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  repository_dispatch:
+    types: [backend-updated, frontend-updated]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+jobs:
+  validate:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Validate docker-compose
+        run: |
+          docker-compose -f docker-compose.local.yml config
+          echo "Docker compose configuration is valid"
+      
+      - name: Lint YAML files
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: docker-compose*.yml
+          config_data: |
+            extends: default
+            rules:
+              line-length: disable
+              truthy: disable
+  deploy:
+    name: Deploy to Server
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.KNOWN_HOSTS }}
+          
+      - name: Setup environment variables
+        run: |
+          echo "DEPLOY_ENV=${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_ENV
+          echo "TIMESTAMP=$(date +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
+          echo "TRIGGER_SOURCE=${{ github.event_name == 'repository_dispatch' && github.event.action || 'direct' }}" >> $GITHUB_ENV
+      
+      - name: Copy files to server
+        run: |
+          rsync -avz --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='README.md' \
+            ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/infrastructure/
+      
+      - name: Deploy services
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/infrastructure
+            
+            # Backup current volumes if needed
+            timestamp=$(date +%Y%m%d%H%M%S)
+            mkdir -p ./backups/$timestamp
+            
+            # Pull latest images
+            docker-compose -f docker-compose.local.yml pull
+            
+            # Deploy with zero downtime if possible
+            docker-compose -f docker-compose.local.yml up -d
+            
+            # Cleanup
+            docker system prune -af --volumes
+            
+            # Verify deployment
+            if docker-compose -f docker-compose.local.yml ps | grep -q "Exit"; then
+              echo "Deployment failed, some containers have exited"
+              exit 1
+            else
+              echo "Deployment successful"
+            fi
+  
+  notify:
+    name: Notify Team
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Discord notification
+        uses: Ilshidur/action-discord@master
+        with:
+          args: |
+            Deployment to ${{ env.DEPLOY_ENV }} environment: ${{ job.status }}
+            ${{ github.event_name == 'repository_dispatch' && format('Triggered by {0} update', github.event.action) || format('Triggered by {0}', github.event_name) }}
+            Repo: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+            Workflow: ${{ github.workflow }}
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        if: ${{ secrets.DISCORD_WEBHOOK_URL != '' }}
