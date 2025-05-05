@@ -1,0 +1,56 @@
+volumes:
+  keycloak-db-data:
+    name: keycloak-db-data
+  member-db-data:
+    name: member-db-data
+  drive-db-data:
+    name: drive-db-data
+
+networks:
+  callv2-auth-db-network:
+    name: callv2-auth-db-network
+  callv2-member-db-network:
+    name: callv2-member-db-network
+  callv2-drive-db-network:
+    name: callv2-drive-db-network
+
+services:
+  keycloak-db:
+    container_name: keycloak-db
+    image: postgres:17.2
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    networks:
+      - callv2-auth-db-network
+    environment:
+      - POSTGRES_PASSWORD=${KC_DB_PASS}
+      - POSTGRES_USER=${KC_DB_USER}
+      - POSTGRES_DB=${KC_DB_BASE}
+
+  member-db:
+    container_name: member-db
+    image: postgres:17.2
+    ports:
+      - 5432:5432
+    volumes:
+      - member-db-data:/var/lib/postgresql/data
+    networks:
+      - callv2-member-db-network
+    environment:
+      - POSTGRES_PASSWORD=${MEMBER_DB_PASS}
+      - POSTGRES_USER=${MEMBER_DB_USER}
+      - POSTGRES_DB=${MEMBER_DB_BASE}
+
+  drive-db:
+    container_name: drive-db
+    image: postgres:17.2
+    ports:
+      - 5433:5432
+    volumes:
+      - drive-db-data:/var/lib/postgresql/data
+    networks:
+      - callv2-drive-db-network
+    environment:
+      - POSTGRES_PASSWORD=${DRIVE_DB_PASS}
+      - POSTGRES_USER=${DRIVE_DB_USER}
+      - POSTGRES_DB=${DRIVE_DB_BASE}
