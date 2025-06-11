@@ -1,0 +1,2 @@
+ALTER TABLE members
+    ADD COLUMN has_system_access BOOLEAN NOT NULL DEFAULT FALSE;
