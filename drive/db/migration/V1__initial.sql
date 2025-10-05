@@ -1,51 +1,129 @@
-CREATE TABLE files (
-    id UUID NOT NULL,
-    owner_id VARCHAR(255) NOT NULL,
-    folder_id UUID NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    content_type VARCHAR(255) NOT NULL,
-    content_location VARCHAR(255) NOT NULL,
-    content_size BIGINT NOT NULL,
-    created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
-    PRIMARY KEY (id)
+create table acl_direct_entries (
+    acl_id uuid not null,
+    member_id uuid not null,
+    permission_type varchar(255) not null check (permission_type in ('SHARE', 'ACCESS')),
+    access_permission varchar(255) check (access_permission in ('WRITE', 'READ')),
+    share_permission varchar(255) check (
+        share_permission in ('SHARE_TO_SHARE', 'SHARE_WRITE', 'SHARE_READ')
+    ),
+    granted_at timestamp(6) with time zone not null
 );
-
-CREATE TABLE folders (
-    id UUID NOT NULL,
-    is_root_folder BOOLEAN NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    owner_id VARCHAR(255) NOT NULL,
-    parent_folder_id UUID,
-    created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
-    deleted_at TIMESTAMP(6) WITH TIME ZONE,
-    PRIMARY KEY (id)
+create table acl_inherited_entries (
+    acl_id uuid not null,
+    member_id uuid not null,
+    permission_type varchar(255) not null check (permission_type in ('SHARE', 'ACCESS')),
+    access_permission varchar(255) check (access_permission in ('WRITE', 'READ')),
+    share_permission varchar(255) check (
+        share_permission in ('SHARE_TO_SHARE', 'SHARE_WRITE', 'SHARE_READ')
+    ),
+    granted_at timestamp(6) with time zone not null
 );
-
-CREATE TABLE members (
-    id VARCHAR(255) NOT NULL,
-    username VARCHAR(255),
-    nickname VARCHAR(255),
-    quota_ammount BIGINT NOT NULL,
-    quota_unit VARCHAR(255) NOT NULL CHECK (quota_unit IN ('BYTE', 'KILOBYTE', 'MEGABYTE', 'GIGABYTE', 'TERABYTE')),
-    quota_request_ammount BIGINT,
-    quota_request_unit VARCHAR(255) CHECK (quota_request_unit IN ('BYTE', 'KILOBYTE', 'MEGABYTE', 'GIGABYTE', 'TERABYTE')),
-    quota_requested_at TIMESTAMP(6) WITH TIME ZONE,
-    created_at TIMESTAMP(6) WITH TIME ZONE,
-    updated_at TIMESTAMP(6) WITH TIME ZONE,
-    synchronized_version BIGINT,
-    PRIMARY KEY (id)
+create table acls (
+    id uuid not null,
+    resource_id varchar(36) not null,
+    resource_type varchar(255) check (resource_type in ('FILE', 'FOLDER')) not null,
+    created_at timestamp(6) with time zone not null,
+    updated_at timestamp(6) with time zone not null,
+    primary key (id)
 );
-
-CREATE TABLE sub_folders (
-    parent_folder_id UUID NOT NULL,
-    sub_folder_id UUID NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    PRIMARY KEY (parent_folder_id, sub_folder_id)
+create table file_access_acls (
+    file_id uuid not null,
+    member_id uuid not null,
+    effective_access_permission varchar(30) check (effective_access_permission in ('WRITE', 'READ')),
+    primary key (file_id, member_id)
 );
-
-ALTER TABLE IF EXISTS sub_folders
-    ADD CONSTRAINT fk_sub_folders_parent_folder_id
-    FOREIGN KEY (parent_folder_id)
-    REFERENCES folders;
+create table file_sharings (
+    id uuid not null,
+    file_id uuid not null,
+    shared_by uuid,
+    shared_to uuid,
+    virtual_folder uuid,
+    created_at timestamp(6) with time zone,
+    primary key (id)
+);
+create table files (
+    id uuid not null,
+    creator_id uuid not null,
+    owner_id uuid not null,
+    folder_id uuid not null,
+    name varchar(255) not null,
+    content_type varchar(255) not null,
+    content_size bigint not null,
+    content_storage_key varchar(255) not null,
+    updated_by uuid not null,
+    deleted_by uuid,
+    created_at timestamp(6) with time zone not null,
+    deleted_at timestamp(6) with time zone,
+    updated_at timestamp(6) with time zone not null,
+    is_deleted boolean not null,
+    primary key (id)
+);
+create table folder_access_acls (
+    folder_id uuid not null,
+    member_id uuid not null,
+    effective_access_permission varchar(30) check (effective_access_permission in ('WRITE', 'READ')),
+    primary key (folder_id, member_id)
+);
+create table folders (
+    id uuid not null,
+    creator_id uuid not null,
+    owner_id uuid not null,
+    parent_folder_id uuid,
+    name varchar(255) not null,
+    is_root_folder boolean not null,
+    is_default_shared_inbox boolean not null,
+    created_at timestamp(6) with time zone not null,
+    deleted_at timestamp(6) with time zone,
+    updated_at timestamp(6) with time zone not null,
+    primary key (id)
+);
+create table folder_sharings (
+    id uuid not null,
+    folder_id uuid not null,
+    virtual_folder uuid not null,
+    shared_by uuid not null,
+    shared_to uuid not null,
+    created_at timestamp(6) with time zone not null,
+    primary key (id)
+);
+create table members (
+    id uuid not null,
+    username varchar(255),
+    nickname varchar(255),
+    quota_amount bigint not null,
+    quota_unit varchar(255) not null check (
+        quota_unit in (
+            'BYTE',
+            'KILOBYTE',
+            'MEGABYTE',
+            'GIGABYTE',
+            'TERABYTE'
+        )
+    ),
+    quota_in_bytes bigint not null,
+    quota_request_amount bigint,
+    quota_request_unit varchar(255) check (
+        quota_request_unit in (
+            'BYTE',
+            'KILOBYTE',
+            'MEGABYTE',
+            'GIGABYTE',
+            'TERABYTE'
+        )
+    ),
+    quota_request_in_bytes bigint,
+    quota_requested_at timestamp(6) with time zone,
+    has_system_access boolean not null,
+    created_at timestamp(6) with time zone,
+    updated_at timestamp(6) with time zone,
+    synchronized_version bigint,
+    primary key (id)
+);
+alter table if exists acl_direct_entries
+add constraint FK_acl_direct_entries_acls_acl_id foreign key (acl_id) references acls;
+alter table if exists acl_inherited_entries
+add constraint FK_acl_inherited_entries_acls_acl_id foreign key (acl_id) references acls;
+alter table if exists file_sharings
+add constraint FK_file_sharings_files_file_id foreign key (file_id) references files;
+alter table if exists folder_sharings
+add constraint FK_folder_sharings_folders_folder_id foreign key (folder_id) references folders;
