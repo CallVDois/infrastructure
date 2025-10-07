@@ -1,27 +1,18 @@
-create table acl_direct_entries (
+create table acl_entries (
+    id uuid not null,
     acl_id uuid not null,
     member_id uuid not null,
-    permission_type varchar(255) not null check (permission_type in ('SHARE', 'ACCESS')),
-    access_permission varchar(255) check (access_permission in ('WRITE', 'READ')),
-    share_permission varchar(255) check (
-        share_permission in ('SHARE_TO_SHARE', 'SHARE_WRITE', 'SHARE_READ')
-    ),
-    granted_at timestamp(6) with time zone not null
-);
-create table acl_inherited_entries (
-    acl_id uuid not null,
-    member_id uuid not null,
-    permission_type varchar(255) not null check (permission_type in ('SHARE', 'ACCESS')),
-    access_permission varchar(255) check (access_permission in ('WRITE', 'READ')),
-    share_permission varchar(255) check (
-        share_permission in ('SHARE_TO_SHARE', 'SHARE_WRITE', 'SHARE_READ')
-    ),
-    granted_at timestamp(6) with time zone not null
+    permission_type varchar(255) not null check (permission_type in ('ACCESS')),
+    access_permission varchar(255) check (access_permission in ('SHARE', 'WRITE', 'READ')),
+    entry_type varchar(255) not null check (entry_type in ('DIRECT', 'INHERITED')),
+    granted_at timestamp(6) with time zone not null,
+    primary key (id)
 );
 create table acls (
     id uuid not null,
     resource_id varchar(36) not null,
-    resource_type varchar(255) check (resource_type in ('FILE', 'FOLDER')) not null,
+    resource_type varchar(36) check (resource_type in ('FILE', 'FOLDER')) not null,
+    resource_owner uuid not null,
     created_at timestamp(6) with time zone not null,
     updated_at timestamp(6) with time zone not null,
     primary key (id)
@@ -29,7 +20,9 @@ create table acls (
 create table file_access_acls (
     file_id uuid not null,
     member_id uuid not null,
-    effective_access_permission varchar(30) check (effective_access_permission in ('WRITE', 'READ')),
+    effective_access_permission varchar(30) check (
+        effective_access_permission in ('SHARE', 'WRITE', 'READ')
+    ),
     primary key (file_id, member_id)
 );
 create table file_sharings (
@@ -61,8 +54,19 @@ create table files (
 create table folder_access_acls (
     folder_id uuid not null,
     member_id uuid not null,
-    effective_access_permission varchar(30) check (effective_access_permission in ('WRITE', 'READ')),
+    effective_access_permission varchar(30) check (
+        effective_access_permission in ('SHARE', 'WRITE', 'READ')
+    ),
     primary key (folder_id, member_id)
+);
+create table folder_sharings (
+    id uuid not null,
+    folder_id uuid not null,
+    virtual_folder uuid not null,
+    shared_by uuid not null,
+    shared_to uuid not null,
+    created_at timestamp(6) with time zone not null,
+    primary key (id)
 );
 create table folders (
     id uuid not null,
@@ -75,15 +79,6 @@ create table folders (
     created_at timestamp(6) with time zone not null,
     deleted_at timestamp(6) with time zone,
     updated_at timestamp(6) with time zone not null,
-    primary key (id)
-);
-create table folder_sharings (
-    id uuid not null,
-    folder_id uuid not null,
-    virtual_folder uuid not null,
-    shared_by uuid not null,
-    shared_to uuid not null,
-    created_at timestamp(6) with time zone not null,
     primary key (id)
 );
 create table members (
@@ -119,11 +114,9 @@ create table members (
     synchronized_version bigint,
     primary key (id)
 );
-alter table if exists acl_direct_entries
-add constraint FK_acl_direct_entries_acls_acl_id foreign key (acl_id) references acls;
-alter table if exists acl_inherited_entries
-add constraint FK_acl_inherited_entries_acls_acl_id foreign key (acl_id) references acls;
+alter table if exists acl_entries
+add constraint fk_acl_entries_acl_id foreign key (acl_id) references acls;
 alter table if exists file_sharings
-add constraint FK_file_sharings_files_file_id foreign key (file_id) references files;
+add constraint fk_file_sharings_file_id foreign key (file_id) references files;
 alter table if exists folder_sharings
-add constraint FK_folder_sharings_folders_folder_id foreign key (folder_id) references folders;
+add constraint fk_folder_sharings_folder_id foreign key (folder_id) references folders;
