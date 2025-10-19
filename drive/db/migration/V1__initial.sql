@@ -3,7 +3,7 @@ create table acl_entries (
     acl_id uuid not null,
     member_id uuid not null,
     permission_type varchar(255) not null check (permission_type in ('ACCESS')),
-    access_permission varchar(255) check (access_permission in ('SHARE', 'WRITE', 'READ')),
+    access_permission varchar(255) check (access_permission in ('MANAGE', 'WRITE', 'READ')),
     entry_type varchar(255) not null check (entry_type in ('DIRECT', 'INHERITED')),
     granted_at timestamp(6) with time zone not null,
     primary key (id)
@@ -21,7 +21,7 @@ create table file_access_acls (
     file_id uuid not null,
     member_id uuid not null,
     effective_access_permission varchar(30) check (
-        effective_access_permission in ('SHARE', 'WRITE', 'READ')
+        effective_access_permission in ('MANAGE', 'WRITE', 'READ')
     ),
     primary key (file_id, member_id)
 );
@@ -55,7 +55,7 @@ create table folder_access_acls (
     folder_id uuid not null,
     member_id uuid not null,
     effective_access_permission varchar(30) check (
-        effective_access_permission in ('SHARE', 'WRITE', 'READ')
+        effective_access_permission in ('MANAGE', 'WRITE', 'READ')
     ),
     primary key (folder_id, member_id)
 );
